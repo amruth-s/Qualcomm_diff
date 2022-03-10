@@ -22,11 +22,11 @@ void InnerProductLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     caffe_gpu_gemm<Dtype>(CblasNoTrans,
                           transpose_ ? CblasNoTrans : CblasTrans,
                           M_, N_, K_, (Dtype)1.,
-                          bottom_data, weight, (Dtype)0., top_data);
+                          bottom_data, weight, (Dtype)0., top_data, NULL, true);
     if (bias_term_)
       caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, M_, N_, 1, (Dtype)1.,
                             bias_multiplier_.gpu_data(),
-                            this->blobs_[1]->gpu_data(), (Dtype)1., top_data);
+                            this->blobs_[1]->gpu_data(), (Dtype)1., top_data, NULL, true);
   }
 }
 
@@ -42,12 +42,12 @@ void InnerProductLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans,
           K_, N_, M_,
           (Dtype)1., bottom_data, top_diff,
-          (Dtype)1., this->blobs_[0]->mutable_gpu_diff());
+          (Dtype)1., this->blobs_[0]->mutable_gpu_diff(), NULL, true);
     } else {
       caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans,
           N_, K_, M_,
           (Dtype)1., top_diff, bottom_data,
-          (Dtype)1., this->blobs_[0]->mutable_gpu_diff());
+          (Dtype)1., this->blobs_[0]->mutable_gpu_diff(), NULL, true);
     }
   }
   if (bias_term_ && this->param_propagate_down_[1]) {
@@ -64,12 +64,12 @@ void InnerProductLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
       caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans,
           M_, K_, N_,
           (Dtype)1., top_diff, this->blobs_[0]->gpu_data(),
-          (Dtype)0., bottom[0]->mutable_gpu_diff());
+          (Dtype)0., bottom[0]->mutable_gpu_diff(), NULL, true);
     } else {
       caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans,
           M_, K_, N_,
          (Dtype)1., top_diff, this->blobs_[0]->gpu_data(),
-         (Dtype)0., bottom[0]->mutable_gpu_diff());
+         (Dtype)0., bottom[0]->mutable_gpu_diff(), NULL, true);
     }
   }
 }

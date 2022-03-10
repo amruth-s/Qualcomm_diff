@@ -42,8 +42,8 @@ class BaseConvolutionLayer : public Layer<Dtype> {
   void backward_cpu_bias(Dtype* bias, const Dtype* input);
 
 #ifndef CPU_ONLY
-  void forward_gpu_gemm(const Dtype* col_input, const Dtype* weights,
-      Dtype* output, bool skip_im2col = false);
+  void forward_gpu_gemm(const int input_size, const Dtype* col_input, const int weight_size, const Dtype* weights,
+      const int output_size, Dtype* output, float* pruning, const bool is_normal, bool skip_im2col = false);
   void forward_gpu_bias(Dtype* output, const Dtype* bias);
   void backward_gpu_gemm(const Dtype* input, const Dtype* weights,
       Dtype* col_output);
@@ -74,6 +74,7 @@ class BaseConvolutionLayer : public Layer<Dtype> {
   Blob<int> conv_input_shape_;
   /// @brief The spatial dimensions of the col_buffer.
   vector<int> col_buffer_shape_;
+  vector<int> row_buffer_shape_;
   /// @brief The spatial dimensions of the output.
   vector<int> output_shape_;
   const vector<int>* bottom_shape_;
@@ -139,6 +140,16 @@ class BaseConvolutionLayer : public Layer<Dtype> {
           stride_.gpu_data(), dilation_.gpu_data(), col_buff);
     }
   }
+
+    inline void conv_im2row_gpu(const Dtype* data, Dtype* col_buff) {
+	    im2row_gpu(data, conv_in_channels_,
+              conv_input_shape_.cpu_data()[1], conv_input_shape_.cpu_data()[2],
+                kernel_shape_.cpu_data()[0], kernel_shape_.cpu_data()[1],
+	          pad_.cpu_data()[0], pad_.cpu_data()[1],
+	            stride_.cpu_data()[0], stride_.cpu_data()[1],
+	              dilation_.cpu_data()[0], dilation_.cpu_data()[1], col_buff);
+    }
+
   inline void conv_col2im_gpu(const Dtype* col_buff, Dtype* data) {
     if (!force_nd_im2col_ && num_spatial_axes_ == 2) {
       col2im_gpu(col_buff, conv_in_channels_,
@@ -166,6 +177,7 @@ class BaseConvolutionLayer : public Layer<Dtype> {
   int output_offset_;
 
   Blob<Dtype> col_buffer_;
+  Blob<Dtype> row_buffer_;
   Blob<Dtype> bias_multiplier_;
 };
 

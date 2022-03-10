@@ -193,9 +193,7 @@ void BaseConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   // TODO: generalize to handle inputs of different shapes.
   for (int bottom_id = 1; bottom_id < bottom.size(); ++bottom_id) {
     CHECK(bottom[0]->shape() == bottom[bottom_id]->shape())
-        << "shape mismatch - bottom[0]: " << bottom[0]->shape_string()
-        << " vs. bottom[" << bottom_id << "]: "
-        << bottom[bottom_id]->shape_string();
+        << "All inputs must have the same shape.";
   }
   // Shape the tops.
   bottom_shape_ = &bottom[0]->shape();
@@ -231,15 +229,20 @@ void BaseConvolutionLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   // overly large memory usage. In the special case of 1x1 convolution
   // it goes lazily unused to save memory.
   col_buffer_shape_.clear();
+  row_buffer_shape_.clear();
   col_buffer_shape_.push_back(kernel_dim_ * group_);
   for (int i = 0; i < num_spatial_axes_; ++i) {
     if (reverse_dimensions()) {
       col_buffer_shape_.push_back(input_shape(i + 1));
+      row_buffer_shape_.push_back(input_shape(i + 1));
     } else {
       col_buffer_shape_.push_back(output_shape_[i]);
+      row_buffer_shape_.push_back(output_shape_[i]);
     }
   }
+  row_buffer_shape_.push_back(kernel_dim_ * group_);
   col_buffer_.Reshape(col_buffer_shape_);
+  row_buffer_.Reshape(row_buffer_shape_);
   bottom_dim_ = bottom[0]->count(channel_axis_);
   top_dim_ = top[0]->count(channel_axis_);
   num_kernels_im2col_ = conv_in_channels_ * conv_out_spatial_dim_;
@@ -322,31 +325,26 @@ void BaseConvolutionLayer<Dtype>::backward_cpu_bias(Dtype* bias,
 }
 
 #ifndef CPU_ONLY
-
 template <typename Dtype>
-void BaseConvolutionLayer<Dtype>::forward_gpu_gemm(const Dtype* input,
-    const Dtype* weights, Dtype* output, bool skip_im2col) {
+void BaseConvolutionLayer<Dtype>::forward_gpu_gemm(const int input_size, const Dtype* input, const int weight_size,
+    const Dtype* weights, const int output_size, Dtype* output, float* pruning, const bool is_normal, bool skip_im2col) {
   const Dtype* col_buff = input;
   if (!is_1x1_) {
     if (!skip_im2col) {
-      conv_im2col_gpu(input, col_buffer_.mutable_gpu_data());
+      conv_im2row_gpu(input, row_buffer_.mutable_gpu_data());
     }
-    col_buff = col_buffer_.gpu_data();
+    col_buff = row_buffer_.gpu_data();
   }
   for (int g = 0; g < group_; ++g) {
-    caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, conv_out_channels_ /
-        group_, conv_out_spatial_dim_, kernel_dim_,
-        (Dtype)1., weights + weight_offset_ * g, col_buff + col_offset_ * g,
-        (Dtype)0., output + output_offset_ * g);
+      test_conv_function(weights + weight_offset_ * g, col_buff + col_offset_ * g, output + output_offset_ * g, conv_out_channels_/group_, conv_out_spatial_dim_, kernel_dim_, pruning + output_offset_ * g, is_normal);
   }
 }
-
 template <typename Dtype>
 void BaseConvolutionLayer<Dtype>::forward_gpu_bias(Dtype* output,
     const Dtype* bias) {
   caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_output_,
       out_spatial_dim_, 1, (Dtype)1., bias, bias_multiplier_.gpu_data(),
-      (Dtype)1., output);
+      (Dtype)1., output, NULL, true);
 }
 
 template <typename Dtype>
@@ -360,7 +358,7 @@ void BaseConvolutionLayer<Dtype>::backward_gpu_gemm(const Dtype* output,
     caffe_gpu_gemm<Dtype>(CblasTrans, CblasNoTrans, kernel_dim_,
         conv_out_spatial_dim_, conv_out_channels_ / group_,
         (Dtype)1., weights + weight_offset_ * g, output + output_offset_ * g,
-        (Dtype)0., col_buff + col_offset_ * g);
+        (Dtype)0., col_buff + col_offset_ * g, NULL, true);
   }
   if (!is_1x1_) {
     conv_col2im_gpu(col_buff, input);
@@ -379,7 +377,7 @@ void BaseConvolutionLayer<Dtype>::weight_gpu_gemm(const Dtype* input,
     caffe_gpu_gemm<Dtype>(CblasNoTrans, CblasTrans, conv_out_channels_ / group_,
         kernel_dim_, conv_out_spatial_dim_,
         (Dtype)1., output + output_offset_ * g, col_buff + col_offset_ * g,
-        (Dtype)1., weights + weight_offset_ * g);
+        (Dtype)1., weights + weight_offset_ * g, NULL, true);
   }
 }
 

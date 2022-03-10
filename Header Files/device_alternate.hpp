@@ -34,6 +34,7 @@ void classname<Dtype>::funcname##_##gpu(const vector<Blob<Dtype>*>& top, \
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cuda_fp16.h>
 #include <curand.h>
 #include <driver_types.h>  // cuda driver types
 #ifdef USE_CUDNN  // cuDNN acceleration library.

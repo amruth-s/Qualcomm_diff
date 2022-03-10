@@ -84,8 +84,19 @@ class Net {
 
   Dtype ForwardBackward() {
     Dtype loss;
+  /*   clock_t start, end;
+          double cpu_time_used;
+	       start = clock();*/
     Forward(&loss);
+    /*end = clock();
+         cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+     clock_t tart, nd;
+          double pu_time_used;
+	       tart = clock();*/
     Backward();
+    /*nd = clock();
+         pu_time_used = ((double) (nd - tart)) / CLOCKS_PER_SEC;
+	 printf("fwd %lf bwd %lf \n",cpu_time_used,pu_time_used);*/
     return loss;
   }
 
@@ -111,9 +122,9 @@ class Net {
    *        another Net.
    */
   void CopyTrainedLayersFrom(const NetParameter& param);
-  void CopyTrainedLayersFrom(const string& trained_filename);
-  void CopyTrainedLayersFromBinaryProto(const string& trained_filename);
-  void CopyTrainedLayersFromHDF5(const string& trained_filename);
+  void CopyTrainedLayersFrom(const string trained_filename);
+  void CopyTrainedLayersFromBinaryProto(const string trained_filename);
+  void CopyTrainedLayersFromHDF5(const string trained_filename);
   /// @brief Writes the net to a proto.
   void ToProto(NetParameter* param, bool write_diff = false) const;
   /// @brief Writes the net to an HDF5 file.
